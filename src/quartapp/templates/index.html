@@ -73,54 +73,103 @@
         const userTemplate = document.querySelector('#message-template-user');
         const assistantTemplate = document.querySelector('#message-template-assistant');
         const converter = new showdown.Converter();
-        const messages = [];
-
+        let eventSource; // This will handle the SSE connection
+    
+        // Function to send a keep-alive request to the server
+        async function sendKeepAlive() {
+            try {
+                await fetch("/keep-alive", {
+                    method: "POST",
+                });
+                console.log("Keep-alive sent successfully");
+            } catch (error) {
+                console.error("Error sending keep-alive:", error);
+            }
+        }
+    
+        // Send keep-alive request every 30 seconds
+        const keepAliveInterval = setInterval(sendKeepAlive, 30000);
+    
         form.addEventListener("submit", async function(e) {
             e.preventDefault();
             const message = messageInput.value;
-
+            if (!message.trim()) return; // Prevent sending empty messages
+    
+            // Display user message in the UI
             const userTemplateClone = userTemplate.content.cloneNode(true);
             userTemplateClone.querySelector(".message-content").innerText = message;
             targetContainer.appendChild(userTemplateClone);
-
-            const assistantTemplateClone = assistantTemplate.content.cloneNode(true);
-            let messageDiv = assistantTemplateClone.querySelector(".message-content");
-            targetContainer.appendChild(assistantTemplateClone);
-
-            messages.push({
-                "role": "user",
-                "content": message
-            });
+    
+            // Send user message to the server
+            console.log("Sending message to the server:", message);
             const response = await fetch("/chat", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json"
                 },
-                body: JSON.stringify({messages: messages})
+                body: JSON.stringify({message: message})
             });
+    
+            const data = await response.json();
+            const threadName = data.thread_name; // Assuming the backend sends back the thread_name
+            console.log("Received thread name from server:", threadName);
+    
+            let accumulatedContent = '';
+            let isFirstMessage = true;
+            let messageDiv;
 
+            if (!eventSource || eventSource.readyState === EventSource.CLOSED) {
+                // Initialize EventSource if not already done or if it was closed
+                console.log("Initializing EventSource for thread:", threadName);
+                eventSource = new EventSource(`/stream/${threadName}`);
+    
+                // Create a variable to hold the accumulated content
+                let accumulatedContent = '';
+    
+                eventSource.onmessage = function(event) {
+                    const data = JSON.parse(event.data);
+                    
+                    // Check if a termination message is received, then close the eventSource
+                    if (data.content === "StreamEnd") {
+                        console.log("Stream end signal received, closing EventSource.");
+                        eventSource.close();
+                        accumulatedContent = ''; // Reset accumulated content
+                        isFirstMessage = true; // Reset flag for the next message
+                    } else {
+                        // Check if it's the first chunk of a new message
+                        if (isFirstMessage) {
+                            const assistantTemplateClone = assistantTemplate.content.cloneNode(true);
+                            messageDiv = assistantTemplateClone.querySelector(".message-content");
+                            targetContainer.appendChild(assistantTemplateClone);
+                            isFirstMessage = false;
+                        }
 
-            let answer = "";
-            for await (const event of readNDJSONStream(response.body)) {
-                if (event["choices"] && event["choices"].length > 0 && event["choices"][0]["delta"]["content"]) {
-                    // Clear out the DIV if its the first answer chunk we've received
-                    if (answer == "") {
-                        messageDiv.innerHTML = "";
+                        // Accumulate the content from each part of the message
+                        accumulatedContent += data.content;
+                        
+                        // Update assistant's response in the UI with the accumulated content
+                        messageDiv.innerHTML = converter.makeHtml(accumulatedContent);
+                        
+                        // Scroll to the bottom of the message box
+                        targetContainer.scrollTop = targetContainer.scrollHeight;
                     }
-                    answer += event["choices"][0]["delta"]["content"];
-                    messageDiv.innerHTML = converter.makeHtml(answer);
-                    messageDiv.scrollIntoView();
-                } else if (event["error"]) {
-                    messageDiv.innerHTML = "Error: " + event["error"];
-                }
+                };
+    
+                eventSource.onerror = function(error) {
+                    console.error("EventSource failed:", error);
+                    eventSource.close(); // Close the source if there's an error
+                };
             }
-            messages.push({
-                "role": "assistant",
-                "content": answer
-            });
-
-            messageInput.value = "";
+    
+            messageInput.value = ""; // Clear the input field
         });
+    
+        window.onbeforeunload = function() {
+            clearInterval(keepAliveInterval); // Clear the keep-alive interval
+            if (eventSource) {
+                eventSource.close(); // Close the SSE connection when the window is closing
+            }
+        };
     </script>
 </body>
 </html>
