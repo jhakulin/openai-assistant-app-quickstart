@@ -99,7 +99,10 @@
             const userTemplateClone = userTemplate.content.cloneNode(true);
             userTemplateClone.querySelector(".message-content").innerText = message;
             targetContainer.appendChild(userTemplateClone);
-    
+
+            // Scroll to the bottom of the message box
+            targetContainer.scrollTop = targetContainer.scrollHeight;
+            
             // Send user message to the server
             console.log("Sending message to the server:", message);
             const response = await fetch("/chat", {

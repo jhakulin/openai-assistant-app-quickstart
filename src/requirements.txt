@@ -156,7 +156,7 @@ urllib3==2.2.1
     # via requests
 uvicorn[standard]==0.29.0
     # via quartapp (pyproject.toml)
-# uvloop==0.19.0
+uvloop==0.19.0
     # via uvicorn
 watchfiles==0.21.0
     # via uvicorn
@@ -171,5 +171,5 @@ wsproto==1.2.0
     # via hypercorn
 yarl==1.9.4
     # via aiohttp
-https://github.com/jhakulin/azureai-assistant-tool/releases/download/v0.3.3-alpha/azure_ai_assistant-0.3.3a1-py3-none-any.whl
+https://github.com/jhakulin/azureai-assistant-tool/releases/download/v0.3.6-alpha/azure_ai_assistant-0.3.6a1-py3-none-any.whl
     # via quartapp (pyproject.toml)

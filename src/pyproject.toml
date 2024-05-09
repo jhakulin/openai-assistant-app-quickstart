@@ -11,7 +11,8 @@ dependencies = [
     "azure-identity",
     "aiohttp",
     "python-dotenv",
-    "pyyaml"
+    "pyyaml",
+    "azure-ai-assistant"
     ]
 
 [build-system]

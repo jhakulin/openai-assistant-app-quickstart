@@ -1,7 +1,7 @@
 import asyncio
 import json, os
 from quart import Blueprint, jsonify, request, Response, render_template, current_app
-
+import azure.identity.aio
 from azure.ai.assistant.management.async_chat_assistant_client import AsyncChatAssistantClient
 from azure.ai.assistant.management.ai_client_factory import AsyncAIClientType
 from azure.ai.assistant.management.async_assistant_client_callbacks import AsyncAssistantClientCallbacks
@@ -11,6 +11,7 @@ from azure.ai.assistant.management.async_conversation_thread_client import Async
 bp = Blueprint("chat", __name__, template_folder="templates", static_folder="static")
 user_queues = {}
 
+
 class MyAssistantClientCallbacks(AsyncAssistantClientCallbacks):
     def __init__(self, message_queue):
         super().__init__()
@@ -19,17 +20,14 @@ class MyAssistantClientCallbacks(AsyncAssistantClientCallbacks):
     async def on_run_update(self, assistant_name, run_identifier, run_status, thread_name, is_first_message=False, message=None):
         if run_status == "streaming":
             current_app.logger.info(f"Stream message: {message}")
-            #action = "start" if is_first_message else "message"
             await self.message_queue.put(("message", message))
-        elif run_status == "completed":
-            current_app.logger.info(f"Run completed with status: {run_status}")
-            await self.message_queue.put(("end", run_status))
-    #async def on_run_end(self, assistant_name, run_identifier, run_end_time, run_status, thread_name):
-    #    current_app.logger.info(f"Run ended with status: {run_status}")
-    #    await self.message_queue.put(("end", run_status))
+
+    async def on_run_end(self, assistant_name, run_identifier, run_end_time, thread_name, response=None):
+        await self.message_queue.put(("end", "RunEnd"))
 
     async def on_function_call_processed(self, assistant_name, run_identifier, function_name, arguments, response):
-        await self.message_queue.put(("function", function_name))
+        #await self.message_queue.put(("function", function_name))
+        pass
 
 async def read_config(assistant_name):
     config_path = f"config/{assistant_name}_assistant_config.yaml"
@@ -56,7 +54,41 @@ async def read_config(assistant_name):
 @bp.before_app_serving
 async def configure_assistant_client():
     config = await read_config("PetTravelPlanChatAssistant")
+    client_args = {}
     if config:
+        if os.getenv("LOCAL_OPENAI_ENDPOINT"):
+            # Use a local endpoint like llamafile server
+            current_app.logger.info("Using local OpenAI-compatible API with no key")
+            client_args["api_key"] = "no-key-required"
+            client_args["base_url"] = os.getenv("LOCAL_OPENAI_ENDPOINT")
+        else:
+            if os.getenv("AZURE_OPENAI_API_KEY"):
+                # Authenticate using an Azure OpenAI API key
+                # This is generally discouraged, but is provided for developers
+                # that want to develop locally inside the Docker container.
+                current_app.logger.info("Using Azure OpenAI with key")
+                client_args["api_key"] = os.getenv("AZURE_OPENAI_API_KEY")
+            else:
+                if client_id := os.getenv("AZURE_OPENAI_CLIENT_ID"):
+                    # Authenticate using a user-assigned managed identity on Azure
+                    # See aca.bicep for value of AZURE_OPENAI_CLIENT_ID
+                    current_app.logger.info(
+                        "Using Azure OpenAI with managed identity for client ID %s",
+                        client_id,
+                    )
+                    default_credential = azure.identity.aio.ManagedIdentityCredential(client_id=client_id)
+                else:
+                    # Authenticate using the default Azure credential chain
+                    # See https://docs.microsoft.com/azure/developer/python/azure-sdk-authenticate#defaultazurecredential
+                    # This will *not* work inside a Docker container.
+                    current_app.logger.info("Using Azure OpenAI with default credential")
+                    default_credential = azure.identity.aio.DefaultAzureCredential(
+                        exclude_shared_token_cache_credential=True
+                    )
+                client_args["azure_ad_token_provider"] = azure.identity.aio.get_bearer_token_provider(
+                    default_credential, "https://cognitiveservices.azure.com/.default"
+                )
+
         # Create a new message queue for this session
         message_queue = asyncio.Queue()
         
@@ -66,7 +98,7 @@ async def configure_assistant_client():
         api_version = os.getenv("AZURE_OPENAI_API_VERSION")
         current_app.logger.info(f"Initializing AsyncChatAssistantClient with callbacks, api_version: {api_version}")
 
-        bp.assistant_client = await AsyncChatAssistantClient.from_yaml(config, callbacks=callbacks)
+        bp.assistant_client = await AsyncChatAssistantClient.from_yaml(config, callbacks=callbacks, **client_args)
         current_app.logger.info("AsyncChatAssistantClient has been initialized with callbacks")
 
         ai_client_type = AsyncAIClientType[bp.assistant_client.assistant_config.ai_client_type]
@@ -75,7 +107,7 @@ async def configure_assistant_client():
         # Create a new conversation thread and store its name
         bp.thread_name = await bp.conversation_thread_client.create_conversation_thread()
         current_app.logger.info(f"Conversation thread created with name: {bp.thread_name}")
-        
+
         # Store the message queue for this thread name in the global dictionary
         user_queues[bp.thread_name] = message_queue
     else:
@@ -104,7 +136,6 @@ async def start_chat():
 
     # Send user message to the conversation thread
     await bp.conversation_thread_client.create_conversation_thread_message(user_message['message'], bp.thread_name)
-    #await bp.assistant_client.process_messages(thread_name=bp.thread_name, stream=True)
     # Process messages in the background, do not await here
     asyncio.create_task(
         bp.assistant_client.process_messages(thread_name=bp.thread_name, stream=True)
