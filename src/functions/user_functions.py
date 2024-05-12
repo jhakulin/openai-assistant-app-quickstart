@@ -1,11 +1,7 @@
 from azure.ai.assistant.management.function_config_manager import FunctionConfigManager
 from azure.ai.assistant.management.function_config_manager import FunctionConfigManager 
 from azure.ai.assistant.management.logger_module import logger
-from datetime import datetime
 import json
-import os
-import platform
-import random
 import re
 
 

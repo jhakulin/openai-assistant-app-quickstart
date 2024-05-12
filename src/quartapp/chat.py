@@ -1,8 +1,13 @@
 import asyncio
-import json, os
+import json, os, logging
 from quart import Blueprint, jsonify, request, Response, render_template, current_app
+#from opentelemetry import trace
+#from opentelemetry.sdk.trace import TracerProvider
+#from opentelemetry.sdk.trace.export import BatchSpanProcessor, ConsoleSpanExporter, SimpleSpanProcessor
+#from promptflow.tracing import start_trace
+
 import azure.identity.aio
-from azure.ai.assistant.management.async_chat_assistant_client import AsyncChatAssistantClient
+from azure.ai.assistant.management.async_assistant_client import AsyncAssistantClient
 from azure.ai.assistant.management.ai_client_factory import AsyncAIClientType
 from azure.ai.assistant.management.async_assistant_client_callbacks import AsyncAssistantClientCallbacks
 from azure.ai.assistant.management.async_conversation_thread_client import AsyncConversationThreadClient
@@ -35,14 +40,14 @@ async def read_config(assistant_name):
         # Log the current directory and its contents
         current_directory = os.getcwd()
         directory_contents = os.listdir(current_directory)
-        current_app.logger.info(f"Current directory: {current_directory}")
-        current_app.logger.info(f"Directory contents: {directory_contents}")
+        #current_app.logger.info(f"Current directory: {current_directory}")
+        #current_app.logger.info(f"Directory contents: {directory_contents}")
 
         # Attempt to read the configuration file
         current_app.logger.info(f"Reading assistant configuration from {config_path}")
         with open(config_path, "r") as file:
             content = file.read()
-            current_app.logger.info(f"file contents: {content}")
+            #current_app.logger.info(f"file contents: {content}")
             return content
     except FileNotFoundError as e:
         current_app.logger.error(f"Configuration file not found at {config_path}: {e}")
@@ -51,8 +56,49 @@ async def read_config(assistant_name):
         current_app.logger.error(f"An error occurred: {e}")
         return None
 
+def setup_app_insights():
+    current_app.logger.info("Setup app insights")
+    #from promptflow.tracing._integrations._openai_injector import inject_openai_api
+    #inject_openai_api()
+
+    # dial down the logs for azure monitor
+    #azmon_logger = logging.getLogger('azure')
+    #azmon_logger.setLevel(logging.WARNING)
+
+    # Set the Tracer Provider
+    #trace.set_tracer_provider(TracerProvider())
+
+    from azure.monitor.opentelemetry.exporter import AzureMonitorTraceExporter
+
+    # Configure Azure Monitor as the Exporter
+    #current_app.logger.info("using the following connection string", os.getenv('APPINSIGHTS_CONNECTION_STRING'))
+    trace_exporter = AzureMonitorTraceExporter(
+        connection_string="InstrumentationKey=f4a52e2b-483d-4d6f-bb4a-c46c305d2409;IngestionEndpoint=https://swedencentral-0.in.applicationinsights.azure.com/;ApplicationId=588fa1ec-14dc-4eaf-8ac3-822cb8f9342f"
+        #os.getenv('APPINSIGHTS_CONNECTION_STRING')
+    )
+
+    # Add the Azure exporter to the tracer provider
+    #trace.get_tracer_provider().add_span_processor(
+    #    SimpleSpanProcessor(trace_exporter)
+    #)
+
+    # Configure Console as the Exporter
+    #file = open('spans.json', 'w')
+
+    # Configure Console as the Exporter and pass the file object
+    #console_exporter = ConsoleSpanExporter(out=file)
+
+    # Add the console exporter to the tracer provider
+    #trace.get_tracer_provider().add_span_processor(
+    #    SimpleSpanProcessor(console_exporter)
+    #)
+    # Get a tracer
+    #return trace.get_tracer(__name__)
+
 @bp.before_app_serving
 async def configure_assistant_client():
+    #start_trace()
+    #setup_app_insights()
     config = await read_config("PetTravelPlanChatAssistant")
     client_args = {}
     if config:
@@ -62,6 +108,7 @@ async def configure_assistant_client():
             client_args["api_key"] = "no-key-required"
             client_args["base_url"] = os.getenv("LOCAL_OPENAI_ENDPOINT")
         else:
+            os.environ['AZURE_OPENAI_API_VERSION'] = '2024-04-01-preview'
             if os.getenv("AZURE_OPENAI_API_KEY"):
                 # Authenticate using an Azure OpenAI API key
                 # This is generally discouraged, but is provided for developers
@@ -96,10 +143,10 @@ async def configure_assistant_client():
         callbacks = MyAssistantClientCallbacks(message_queue)
 
         api_version = os.getenv("AZURE_OPENAI_API_VERSION")
-        current_app.logger.info(f"Initializing AsyncChatAssistantClient with callbacks, api_version: {api_version}")
+        current_app.logger.info(f"Initializing AsyncAssistantClient with callbacks, api_version: {api_version}")
 
-        bp.assistant_client = await AsyncChatAssistantClient.from_yaml(config, callbacks=callbacks, **client_args)
-        current_app.logger.info("AsyncChatAssistantClient has been initialized with callbacks")
+        bp.assistant_client = await AsyncAssistantClient.from_yaml(config, callbacks=callbacks, **client_args)
+        current_app.logger.info("AsyncAssistantClient has been initialized with callbacks")
 
         ai_client_type = AsyncAIClientType[bp.assistant_client.assistant_config.ai_client_type]
         bp.conversation_thread_client = AsyncConversationThreadClient.get_instance(ai_client_type)
@@ -116,7 +163,6 @@ async def configure_assistant_client():
 
 @bp.after_app_serving
 async def shutdown_assistant_client():
-    # Properly close the AsyncChatAssistantClient
     if hasattr(bp, 'conversation_thread_client'):
         await bp.conversation_thread_client.close()
         current_app.logger.info("AsyncChatAssistantClient has been closed")

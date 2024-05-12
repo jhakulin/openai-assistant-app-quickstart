@@ -18,6 +18,15 @@ COPY requirements.txt .
 RUN pip3 install -r requirements.txt
 
 COPY . .
+
+# Copy additional wheel files
+#COPY wheels/*.whl /wheels/
+
+# Install your specific wheel files in the required order
+#RUN pip install --no-cache-dir /wheels/promptflow_devkit-1.11.0.dev0-py3-none-any.whl
+#RUN pip install --no-cache-dir /wheels/promptflow_core-1.11.0.dev0-py3-none-any.whl
+#RUN pip install --no-cache-dir /wheels/promptflow_tracing-1.11.0.dev0-py3-none-any.whl
+
 # ------------------- Stage 2: Final Stage ------------------------------
 FROM base AS final
 
