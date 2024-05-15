@@ -1,6 +1,7 @@
 from azure.ai.assistant.management.function_config_manager import FunctionConfigManager
 from azure.ai.assistant.management.function_config_manager import FunctionConfigManager 
 from azure.ai.assistant.management.logger_module import logger
+from promptflow.tracing import trace
 import json
 import re
 
@@ -8,6 +9,7 @@ import re
 # This file is auto-generated. Do not edit directly.
 
 # User function: validate_booking_reference
+@trace
 def validate_booking_reference(booking_reference):
     function_config_manager = FunctionConfigManager()
     # Updated pattern to accept uppercase letters (A-Z) and numbers (0-9)
@@ -21,6 +23,7 @@ def validate_booking_reference(booking_reference):
     return json.dumps({"result": True})
 
 # User function: send_email
+@trace
 def send_email(email_address, reservation_summary, payment_link):
     function_config_manager = FunctionConfigManager()
     try:
@@ -45,6 +48,7 @@ def send_email(email_address, reservation_summary, payment_link):
         return json.dumps({"function_error": error_message})
 
 # User function: send_sms
+@trace
 def send_sms(phone_number, message):
     function_config_manager = FunctionConfigManager()
     

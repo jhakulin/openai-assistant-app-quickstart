@@ -72,6 +72,6 @@ file_search: false
 code_interpreter: false
 output_folder_path: output
 ai_client_type: AZURE_OPEN_AI
-assistant_type: chat_assistant
+assistant_type: assistant
 completion_settings: null
 assistant_role: user

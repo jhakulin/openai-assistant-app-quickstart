@@ -6,7 +6,6 @@ class ChatClient {
         this.messageInput = document.getElementById("message");
         this.eventSource = null;
         this.keepAliveInterval = null;
-        console.log("ChatClient.js loaded!");
     }
 
     async sendMessage(url) {
@@ -28,7 +27,6 @@ class ChatClient {
     async sendKeepAlive(url) {
         try {
             await fetch(url, { method: "POST" });
-            console.log("Keep-alive sent successfully");
         } catch (error) {
             console.error("Error sending keep-alive:", error);
         }
@@ -53,25 +51,21 @@ class ChatClient {
         let messageDiv = null;
         let accumulatedContent = '';
 
-        console.log("handleMessages");
         this.eventSource.onmessage = event => {
             const data = JSON.parse(event.data);
 
             if (data.content === "StreamEnd") {
-                console.log("Streaming ends");
                 this.eventSource.close();
                 messageDiv = null;
                 accumulatedContent = '';
             } else {
                 if (!messageDiv) {
-                    console.log("Create assistant message box");
                     messageDiv = this.ui.createAssistantMessageDiv();
                     if (!messageDiv) {
                         console.error("Failed to create message div.");
                     }
                 }
                 accumulatedContent += data.content;
-                //console.log(accumulatedContent);
                 this.ui.appendAssistantMessage(messageDiv, accumulatedContent);
             }
         };

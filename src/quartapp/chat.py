@@ -1,10 +1,10 @@
 import asyncio
 import json, os, logging
 from quart import Blueprint, jsonify, request, Response, render_template, current_app
-#from opentelemetry import trace
-#from opentelemetry.sdk.trace import TracerProvider
-#from opentelemetry.sdk.trace.export import BatchSpanProcessor, ConsoleSpanExporter, SimpleSpanProcessor
-#from promptflow.tracing import start_trace
+from opentelemetry import trace
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import BatchSpanProcessor, ConsoleSpanExporter, SimpleSpanProcessor
+from promptflow.tracing import start_trace
 
 import azure.identity.aio
 from azure.ai.assistant.management.async_assistant_client import AsyncAssistantClient
@@ -78,9 +78,9 @@ def setup_app_insights():
     )
 
     # Add the Azure exporter to the tracer provider
-    #trace.get_tracer_provider().add_span_processor(
-    #    SimpleSpanProcessor(trace_exporter)
-    #)
+    trace.get_tracer_provider().add_span_processor(
+        SimpleSpanProcessor(trace_exporter)
+    )
 
     # Configure Console as the Exporter
     #file = open('spans.json', 'w')
@@ -97,8 +97,8 @@ def setup_app_insights():
 
 @bp.before_app_serving
 async def configure_assistant_client():
-    #start_trace()
-    #setup_app_insights()
+    start_trace()
+    setup_app_insights()
     config = await read_config("PetTravelPlanChatAssistant")
     client_args = {}
     if config:

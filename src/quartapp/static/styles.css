@@ -4,16 +4,97 @@
 
 html, body {
     height: 100%;
+    margin: 0;
+    padding: 0;
+    overflow-x: hidden; /* Prevent horizontal scroll */
+}
+
+/* Layout for the chat and document sections */
+.container-fluid {
+    height: 100%;
+}
+
+.row {
+    height: 100%;
+}
+
+/* Chat section */
+#messages {
+    height: calc(100% - 60px); /* Adjust height based on the input area */
+    overflow-y: auto; /* Enable scrolling for overflow content */
 }
 
 #messages .toast-container {
     margin-bottom: 12px;
 }
 
+#chat-area {
+    height: 60px; /* Fixed height for the chat input area */
+    padding: 10px; /* Padding for the input area */
+}
+
+#document-viewer-section {
+    display: none; /* Initially hidden */
+    width: 0; /* Initially take no space */
+    overflow: hidden; /* Prevent any overflow */
+    transition: width 0.3s ease; /* Smooth transition for width adjustments */
+}
+
+.col-md-6 {
+    transition: flex 0.3s ease, max-width 0.3s ease; /* Smooth transition for resizing */
+    flex: 0 0 100%; /* Take full width initially */
+    max-width: 100%; /* Take full width initially */
+}
+
+#document-viewer-section button {
+    padding: 5px 10px;
+    background-color: #f44336; /* Red color for visibility */
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 16px;
+}
+
+#document-viewer-section button:hover {
+    background-color: #d32f2f; /* Slightly darker on hover */
+}
+
+.col-full {
+    flex: 0 0 100%;
+    max-width: 100%;
+}
+
+.hidden {
+    display: none;
+}
+
+/* Background colors for user and assistant messages */
 .background-user {
     background-color: #2372cc;
+    color: white; /* Ensure text is readable on the background */
 }
 
 .background-assistant {
     background-color: #2c8310;
+    color: white; /* Ensure text is readable on the background */
+}
+
+/* Styling for messages */
+.toast {
+    position: relative;
+    display: block;
+    margin-bottom: 0.5rem;
+    border-radius: 0.25rem;
+}
+
+.toast-header {
+    display: flex;
+    align-items: center;
+    padding: 0.5rem 0.75rem;
+    color: #ffffff;
+}
+
+.toast-body {
+    padding: 0.75rem;
 }

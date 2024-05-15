@@ -8,8 +8,6 @@ class ChatUI {
         if (!this.assistantTemplate) {
             console.error("Assistant template not found!");
         }
-        console.log("Assistant Template Content:", this.assistantTemplate.content);
-        console.log("ChatUI.js loaded!");
     }
 
     appendUserMessage(message) {
@@ -21,14 +19,15 @@ class ChatUI {
 
     appendAssistantMessage(messageDiv, accumulatedContent) {
         const converter = new showdown.Converter();
-        messageDiv.innerHTML = converter.makeHtml(accumulatedContent);
+        // Use the specific message-text div to convert Markdown to HTML
+        const messageTextDiv = messageDiv.querySelector(".message-text");
+        if (messageTextDiv) {
+            messageTextDiv.innerHTML = converter.makeHtml(accumulatedContent);
+        }
         this.scrollToBottom();
     }
-
-    createAssistantMessageDiv() {
-        console.log("Creating assistant message div...");
-        console.log("Assistant Template Content:", this.assistantTemplate.content);
     
+    createAssistantMessageDiv() {
         const assistantTemplateClone = this.assistantTemplate.content.cloneNode(true);
         if (!assistantTemplateClone) {
             console.error("Failed to clone assistant template.");
@@ -42,9 +41,7 @@ class ChatUI {
         // you should query the targetContainer for the elements you want to interact with.
         // Specifically, you look at the last added 'toast' which is where the new content lives.
         const newlyAddedToast = this.targetContainer.querySelector(".toast-container:last-child .toast:last-child");
-    
-        console.log("Newly added toast:", newlyAddedToast);
-    
+       
         if (!newlyAddedToast) {
             console.error("Failed to find the newly added toast element.");
             return null;
@@ -55,8 +52,6 @@ class ChatUI {
     
         if (!messageDiv) {
             console.error("Message content div not found in the template.");
-        } else {
-            console.log("Message content div found:", messageDiv);
         }
     
         return messageDiv;
