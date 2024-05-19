@@ -8,6 +8,39 @@ class ChatUI {
         if (!this.assistantTemplate) {
             console.error("Assistant template not found!");
         }
+        this.addCitationClickListener();
+    }
+
+    preprocessContent(content) {
+        // Regular expression to find citations like [n] filename.md
+        const citationRegex = /\[(\d+)\] ([^\s]+\.md)/g;
+        return content.replace(citationRegex, (match, p1, p2) => {
+            return `<a href="#" class="file-citation" data-file-id="${p2}">[${p1}] ${p2}</a>`;
+        });
+    }
+
+    addCitationClickListener() {
+        document.addEventListener('click', (event) => {
+            if (event.target.classList.contains('file-citation')) {
+                event.preventDefault();
+                const fileId = event.target.getAttribute('data-file-id');
+                this.loadDocument(fileId);
+            }
+        });
+    }
+
+    async loadDocument(fileId) {
+        try {
+            const response = await fetch(`/fetch-document?file_id=${fileId}`);
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
+            }
+            const content = await response.text();
+            console.log("call showDocument:", content);
+            window.showDocument(content); // Use the global function to show the document
+        } catch (error) {
+            console.error('Error fetching document:', error);
+        }
     }
 
     appendUserMessage(message) {
@@ -17,16 +50,51 @@ class ChatUI {
         this.scrollToBottom();
     }
 
-    appendAssistantMessage(messageDiv, accumulatedContent) {
-        const converter = new showdown.Converter();
-        // Use the specific message-text div to convert Markdown to HTML
+    appendAssistantMessage(messageDiv, accumulatedContent, isStreaming) {
+        //console.log("Accumulated Content before conversion:", accumulatedContent);
+    
+        // Initialize markdown-it
+        const md = window.markdownit({
+            html: true,
+            linkify: true,
+            typographer: true,
+            breaks: true
+        });
+    
+        try {
+            // Preprocess content to convert citations to links
+            const preprocessedContent = this.preprocessContent(accumulatedContent);
+            // Convert the accumulated content to HTML using markdown-it
+            let htmlContent = md.render(preprocessedContent);
+            const messageTextDiv = messageDiv.querySelector(".message-text");
+            if (!messageTextDiv) {
+                throw new Error("Message content div not found in the template.");
+            }
+    
+            // Set the innerHTML of the message text div to the HTML content
+            messageTextDiv.innerHTML = htmlContent;
+   
+            // Use requestAnimationFrame to ensure the DOM has updated before scrolling
+            // Only scroll if not streaming
+            if (!isStreaming) {
+                console.log("Accumulated content:", accumulatedContent);
+                console.log("HTML set to messageTextDiv:", messageTextDiv.innerHTML);
+                requestAnimationFrame(() => {
+                    this.scrollToBottom();
+                });
+            }
+        } catch (error) {
+            console.error("Error in appendAssistantMessage:", error);
+        }
+    }
+
+    clearAssistantMessage(messageDiv) {
         const messageTextDiv = messageDiv.querySelector(".message-text");
         if (messageTextDiv) {
-            messageTextDiv.innerHTML = converter.makeHtml(accumulatedContent);
+            messageTextDiv.innerHTML = '';
         }
-        this.scrollToBottom();
     }
-    
+
     createAssistantMessageDiv() {
         const assistantTemplateClone = this.assistantTemplate.content.cloneNode(true);
         if (!assistantTemplateClone) {
@@ -58,7 +126,17 @@ class ChatUI {
     }
     
     scrollToBottom() {
-        this.targetContainer.scrollTop = this.targetContainer.scrollHeight;
+        const lastChild = this.targetContainer.lastElementChild;
+        if (lastChild) {
+            // Adjust the scroll to make sure the input box is visible
+            lastChild.scrollIntoView({ behavior: 'smooth', block: 'end' });
+        }
+        
+        // Ensure the input box remains visible
+        const inputBox = document.querySelector('#chat-area');
+        if (inputBox) {
+            inputBox.scrollIntoView({ behavior: 'smooth', block: 'end' });
+        }
     }
 }
 

@@ -11,6 +11,7 @@ from azure.ai.assistant.management.async_assistant_client import AsyncAssistantC
 from azure.ai.assistant.management.ai_client_factory import AsyncAIClientType
 from azure.ai.assistant.management.async_assistant_client_callbacks import AsyncAssistantClientCallbacks
 from azure.ai.assistant.management.async_conversation_thread_client import AsyncConversationThreadClient
+from azure.ai.assistant.management.async_message import AsyncConversationMessage
 
 
 bp = Blueprint("chat", __name__, template_folder="templates", static_folder="static")
@@ -22,13 +23,22 @@ class MyAssistantClientCallbacks(AsyncAssistantClientCallbacks):
         super().__init__()
         self.message_queue = message_queue
 
-    async def on_run_update(self, assistant_name, run_identifier, run_status, thread_name, is_first_message=False, message=None):
+    async def on_run_update(self, assistant_name, run_identifier, run_status, thread_name, is_first_message=False, message : AsyncConversationMessage = None):
         if run_status == "streaming":
-            current_app.logger.info(f"Stream message: {message}")
-            await self.message_queue.put(("message", message))
+            text_message_content = message.text_message.content
+            current_app.logger.info(f"Stream message: {text_message_content}")
+            await self.message_queue.put(("message", text_message_content))
+        elif run_status == "completed":
+            current_app.logger.info("run status completed")
+            text_message = message.text_message
+            current_app.logger.info(f"message.text_message.content: {text_message.content}")
+            if text_message.file_citations:
+                for file_citation in text_message.file_citations:
+                    current_app.logger.info(f"\nFile citation, file_id: {file_citation.file_id}, file_name: {file_citation.file_name}")
+            await self.message_queue.put(("completed_message", text_message.content))
 
     async def on_run_end(self, assistant_name, run_identifier, run_end_time, thread_name, response=None):
-        await self.message_queue.put(("end", "RunEnd"))
+        await self.message_queue.put(("stream_end", ""))
 
     async def on_function_call_processed(self, assistant_name, run_identifier, function_name, arguments, response):
         #await self.message_queue.put(("function", function_name))
@@ -97,18 +107,17 @@ def setup_app_insights():
 
 @bp.before_app_serving
 async def configure_assistant_client():
-    start_trace()
-    setup_app_insights()
-    config = await read_config("PetTravelPlanChatAssistant")
+    #start_trace()
+    #setup_app_insights()
+    #config = await read_config("PetTravelPlanChatAssistant")
+    config = await read_config("assistant_v2")
     client_args = {}
     if config:
-        if os.getenv("LOCAL_OPENAI_ENDPOINT"):
-            # Use a local endpoint like llamafile server
-            current_app.logger.info("Using local OpenAI-compatible API with no key")
-            client_args["api_key"] = "no-key-required"
-            client_args["base_url"] = os.getenv("LOCAL_OPENAI_ENDPOINT")
+        if os.getenv("OPENAI_API_KEY"):
+            current_app.logger.info("Using OpenAI API key")
+            client_args["api_key"] = os.getenv("OPENAI_API_KEY")
         else:
-            os.environ['AZURE_OPENAI_API_VERSION'] = '2024-04-01-preview'
+            os.environ['AZURE_OPENAI_API_VERSION'] = '2024-05-01-preview'
             if os.getenv("AZURE_OPENAI_API_KEY"):
                 # Authenticate using an Azure OpenAI API key
                 # This is generally discouraged, but is provided for developers
@@ -194,6 +203,29 @@ async def keep_alive():
     # Respond with an empty message to indicate that the connection is still active
     return Response("", status=200)
 
+@bp.get("/fetch-document")
+async def fetch_document():
+    file_id = request.args.get('file_id')
+    current_app.logger.info(f"fetch_document: {file_id}")
+    if not file_id:
+        return jsonify({"error": "File ID is required"}), 400
+
+    # Fetch the content based on file_id
+    content = await fetch_file_content(file_id)
+    if content is None:
+        return jsonify({"error": "File not found"}), 404
+
+    return Response(content, mimetype='text/html')
+
+async def fetch_file_content(file_id):
+    # Replace with actual file fetching logic
+    dummy_content = {
+        "product_info_1.md": "<h1>Product Info 1</h1><p>Details about product 1...</p>",
+        "product_info_2.md": "<h1>Product Info 2</h1><p>Details about product 2...</p>",
+    }
+    current_app.logger.info(f"fetch_file_content: {dummy_content.get(file_id, None)}")
+    return dummy_content.get(file_id, None)
+
 @bp.route('/stream/<thread_name>', methods=['GET'])
 async def stream_responses(thread_name):
     # Set necessary headers for SSE
@@ -222,15 +254,15 @@ async def stream_responses(thread_name):
                 message_type, message = await message_queue.get()
 
                 if message_type == "message":
-                    event_data = json.dumps({'content': message})
+                    event_data = json.dumps({'content': message, 'type': message_type})
                     yield f"data: {event_data}\n\n"
-
-                elif message_type == "end":
-                    end_message = "StreamEnd"
-                    event_data = json.dumps({'content': end_message})
+                elif message_type == "completed_message":
+                    event_data = json.dumps({'content': message, 'type': message_type})
                     yield f"data: {event_data}\n\n"
-                    return  # This will end the function and thus the stream
-
+                elif message_type == "stream_end":
+                    event_data = json.dumps({'content': message, 'type': message_type})
+                    yield f"data: {event_data}\n\n"
+                    return
                 elif message_type == "function":
                     function_message = f"Function {message} called"
                     event_data = json.dumps({'content': function_message})

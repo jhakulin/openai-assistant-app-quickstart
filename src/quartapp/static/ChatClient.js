@@ -50,11 +50,12 @@ class ChatClient {
     handleMessages() {
         let messageDiv = null;
         let accumulatedContent = '';
+        let isStreaming = true;
 
         this.eventSource.onmessage = event => {
             const data = JSON.parse(event.data);
 
-            if (data.content === "StreamEnd") {
+            if (data.type === "stream_end") {
                 this.eventSource.close();
                 messageDiv = null;
                 accumulatedContent = '';
@@ -65,8 +66,21 @@ class ChatClient {
                         console.error("Failed to create message div.");
                     }
                 }
-                accumulatedContent += data.content;
-                this.ui.appendAssistantMessage(messageDiv, accumulatedContent);
+
+                // Check if it's a completed message
+                if (data.type === "completed_message") {
+                    //console.log("Received completed message:", data.content);
+                    // Replace the accumulated content with the completed message
+                    this.ui.clearAssistantMessage(messageDiv);
+                    accumulatedContent = data.content;
+                    isStreaming = false;
+                } else {
+                    //console.log("Received partial message:", data.content);
+                    // Append the partial message to the accumulated content
+                    accumulatedContent += data.content;
+                }
+
+                this.ui.appendAssistantMessage(messageDiv, accumulatedContent, isStreaming);
             }
         };
 

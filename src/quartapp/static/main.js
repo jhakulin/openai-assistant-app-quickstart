@@ -17,52 +17,61 @@ function initChat() {
         chatClient.messageInput.value = ""; // Clear the input field
     });
 
-    // Handle clicks on document links within the chat
-    document.addEventListener('click', function (e) {
-        if (e.target.tagName === 'A' && e.target.classList.contains('document-link')) {
-            e.preventDefault();
-            const docUrl = e.target.href;
-            showDocument(docUrl);
-        }
-    });
-
     window.onbeforeunload = function() {
         chatClient.stopKeepAlive();
         chatClient.closeEventSource();
     };
+
+    // Attach closeDocumentViewer function to the close button
+    const closeButton = document.getElementById("close-button");
+    if (closeButton) {
+        closeButton.addEventListener("click", window.closeDocumentViewer);
+    }
 }
 
 // Function to show the document in the split view
-function showDocument(url) {
+window.showDocument = function(content) {
+    console.log("showDocument:", content);
     const docViewerSection = document.getElementById("document-viewer-section");
     const chatColumn = document.getElementById("chat-container");
 
-    // Load the document URL into the iframe
-    document.getElementById("document-viewer").src = url;
+    // Load the document content into the iframe
+    const iframe = document.getElementById("document-viewer");
+    iframe.srcdoc = content;
+
+    // Check if the iframe content is loaded correctly
+    iframe.onload = function() {
+        console.log("Iframe loaded successfully.");
+    };
+    iframe.onerror = function() {
+        console.error("Error loading iframe content.");
+    };
 
     // Update Bootstrap grid classes for splitting the screen
-    chatColumn.classList.remove("col-12");
-    chatColumn.classList.add("col-6");
-    docViewerSection.classList.remove("col-0");
-    docViewerSection.classList.add("col-6");
+    chatColumn.classList.remove("col-full");
+    chatColumn.classList.add("col-half");
+    docViewerSection.classList.add("visible");
+    docViewerSection.classList.remove("hidden");
 
-    // Make the document viewer visible
+    // Make the document viewer and the close button visible
     docViewerSection.style.display = 'block';
+    document.getElementById("close-button").style.display = 'block';
 }
 
 // Function to close the document viewer and restore full chat view
-function closeDocumentViewer() {
+window.closeDocumentViewer = function() {
     const docViewerSection = document.getElementById("document-viewer-section");
     const chatColumn = document.getElementById("chat-container");
 
-    // Hide the document viewer
+    // Hide the document viewer and the close button
     docViewerSection.style.display = 'none';
-    docViewerSection.classList.remove("col-6");
-    docViewerSection.classList.add("col-0");
+    docViewerSection.classList.add("hidden");
+    docViewerSection.classList.remove("visible");
+    document.getElementById("close-button").style.display = 'none';
 
     // Restore the chat column to full width
-    chatColumn.classList.remove("col-6");
-    chatColumn.classList.add("col-12");
+    chatColumn.classList.remove("col-half");
+    chatColumn.classList.add("col-full");
 }
 
 document.addEventListener("DOMContentLoaded", initChat);

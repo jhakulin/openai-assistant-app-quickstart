@@ -9,11 +9,6 @@ html, body {
     overflow-x: hidden; /* Prevent horizontal scroll */
 }
 
-/* Layout for the chat and document sections */
-.container-fluid {
-    height: 100%;
-}
-
 .row {
     height: 100%;
 }
@@ -28,9 +23,70 @@ html, body {
     margin-bottom: 12px;
 }
 
+/* Styles for the message box */
+#messages .message-content {
+    /* Other styles... */
+    font-size: 16px;
+    font-family: Arial, sans-serif; /* Example font */
+}
+
+#messages .message-content ol {
+    padding-left: 20px;
+    list-style-type: decimal; /* Ensures numbered lists are displayed correctly */
+}
+
+#messages .message-content ol li {
+    margin-bottom: 5px;
+}
+
+/* Ensure consistent font size and styling for message text */
+.message-text {
+    font-size: 16px;
+    font-family: Arial, sans-serif;
+}
+
+.message-text h1, 
+.message-text h2, 
+.message-text h3, 
+.message-text h4, 
+.message-text h5, 
+.message-text h6,
+.message-text p,
+.message-text span,
+.message-text div {
+    font-size: 16px;
+    font-family: Arial, sans-serif;
+    margin: 0; /* Reset margin to avoid extra spacing */
+    line-height: 1.5; /* Ensure consistent line height */
+}
+
+/* Optional: Adjust font weight for headers to distinguish them without changing size */
+.message-text h1, 
+.message-text h2, 
+.message-text h3, 
+.message-text h4, 
+.message-text h5, 
+.message-text h6 {
+    font-weight: bold;
+}
+
 #chat-area {
     height: 60px; /* Fixed height for the chat input area */
     padding: 10px; /* Padding for the input area */
+}
+
+/* Ensure Flexbox is applied to parent and children elements */
+.container-fluid {
+    display: flex;
+    flex-direction: row;
+    height: 100%;
+}
+
+#chat-container {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
 }
 
 #document-viewer-section {
@@ -40,10 +96,24 @@ html, body {
     transition: width 0.3s ease; /* Smooth transition for width adjustments */
 }
 
-.col-md-6 {
-    transition: flex 0.3s ease, max-width 0.3s ease; /* Smooth transition for resizing */
-    flex: 0 0 100%; /* Take full width initially */
-    max-width: 100%; /* Take full width initially */
+#document-viewer-section.visible {
+    display: block; /* Make visible */
+    width: 50%; /* Adjust width as needed */
+    overflow: auto; /* Allow scrolling if needed */
+}
+
+.col-full {
+    flex: 0 0 100%;
+    max-width: 100%;
+}
+
+.col-half {
+    flex: 0 0 50%;
+    max-width: 50%;
+}
+
+.hidden {
+    display: none;
 }
 
 #document-viewer-section button {
@@ -60,13 +130,20 @@ html, body {
     background-color: #d32f2f; /* Slightly darker on hover */
 }
 
-.col-full {
-    flex: 0 0 100%;
-    max-width: 100%;
+#document-viewer {
+    flex: 1;
+    width: 100%;
+    height: 100%;
+    border: none;
+    background-color: white;
 }
 
-.hidden {
-    display: none;
+#close-button {
+    display: none; /* Initially hidden */
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    z-index: 10;
 }
 
 /* Background colors for user and assistant messages */
