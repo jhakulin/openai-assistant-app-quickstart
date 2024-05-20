@@ -1,17 +1,20 @@
-import asyncio
-import json, os, logging
-from quart import Blueprint, jsonify, request, Response, render_template, current_app
-from opentelemetry import trace
-from opentelemetry.sdk.trace import TracerProvider
-from opentelemetry.sdk.trace.export import BatchSpanProcessor, ConsoleSpanExporter, SimpleSpanProcessor
-from promptflow.tracing import start_trace
+# Copyright (c) Microsoft. All rights reserved.
+# Licensed under the MIT license. See LICENSE.md file in the project root for full license information.
 
-import azure.identity.aio
 from azure.ai.assistant.management.async_assistant_client import AsyncAssistantClient
 from azure.ai.assistant.management.ai_client_factory import AsyncAIClientType
 from azure.ai.assistant.management.async_assistant_client_callbacks import AsyncAssistantClientCallbacks
 from azure.ai.assistant.management.async_conversation_thread_client import AsyncConversationThreadClient
 from azure.ai.assistant.management.async_message import AsyncConversationMessage
+import azure.identity.aio
+
+from quart import Blueprint, jsonify, request, Response, render_template, current_app
+from opentelemetry import trace
+from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+from promptflow.tracing import start_trace
+
+import asyncio
+import json, os
 
 
 bp = Blueprint("chat", __name__, template_folder="templates", static_folder="static")
@@ -23,7 +26,6 @@ file_id_map = {
 }
 
 user_queues = {}
-
 
 class MyAssistantClientCallbacks(AsyncAssistantClientCallbacks):
     def __init__(self, message_queue):
@@ -72,20 +74,10 @@ async def read_config(assistant_name):
 
 def setup_app_insights():
     current_app.logger.info("Setup app insights")
-    #from promptflow.tracing._integrations._openai_injector import inject_openai_api
-    #inject_openai_api()
-
-    # dial down the logs for azure monitor
-    #azmon_logger = logging.getLogger('azure')
-    #azmon_logger.setLevel(logging.WARNING)
-
-    # Set the Tracer Provider
-    #trace.set_tracer_provider(TracerProvider())
 
     from azure.monitor.opentelemetry.exporter import AzureMonitorTraceExporter
 
     # Configure Azure Monitor as the Exporter
-    #current_app.logger.info("using the following connection string", os.getenv('APPINSIGHTS_CONNECTION_STRING'))
     trace_exporter = AzureMonitorTraceExporter(
         connection_string="InstrumentationKey=f4a52e2b-483d-4d6f-bb4a-c46c305d2409;IngestionEndpoint=https://swedencentral-0.in.applicationinsights.azure.com/;ApplicationId=588fa1ec-14dc-4eaf-8ac3-822cb8f9342f"
         #os.getenv('APPINSIGHTS_CONNECTION_STRING')
@@ -95,19 +87,6 @@ def setup_app_insights():
     trace.get_tracer_provider().add_span_processor(
         SimpleSpanProcessor(trace_exporter)
     )
-
-    # Configure Console as the Exporter
-    #file = open('spans.json', 'w')
-
-    # Configure Console as the Exporter and pass the file object
-    #console_exporter = ConsoleSpanExporter(out=file)
-
-    # Add the console exporter to the tracer provider
-    #trace.get_tracer_provider().add_span_processor(
-    #    SimpleSpanProcessor(console_exporter)
-    #)
-    # Get a tracer
-    #return trace.get_tracer(__name__)
 
 @bp.before_app_serving
 async def configure_assistant_client():
@@ -159,7 +138,6 @@ async def configure_assistant_client():
         current_app.logger.info(f"Initializing AsyncAssistantClient with callbacks, api_version: {api_version}")
 
         bp.assistant_client = await AsyncAssistantClient.from_yaml(config, callbacks=callbacks, **client_args)
-        current_app.logger.info("AsyncAssistantClient has been initialized with callbacks")
 
         ai_client_type = AsyncAIClientType[bp.assistant_client.assistant_config.ai_client_type]
         bp.conversation_thread_client = AsyncConversationThreadClient.get_instance(ai_client_type)
@@ -201,11 +179,6 @@ async def start_chat():
     )
 
     return jsonify({"thread_name": bp.thread_name, "message": "Processing started"}), 200
-
-@bp.route('/keep-alive', methods=['POST'])
-async def keep_alive():
-    # Respond with an empty message to indicate that the connection is still active
-    return Response("", status=200)
 
 @bp.route('/fetch-document', methods=['GET'])
 async def fetch_document():

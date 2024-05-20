@@ -1,11 +1,11 @@
-// ChatClient.js
+// Copyright (c) Microsoft. All rights reserved.
+// Licensed under the MIT license. See LICENSE.md file in the project root for full license information.
 
 class ChatClient {
     constructor(ui) {
         this.ui = ui;
         this.messageInput = document.getElementById("message");
         this.eventSource = null;
-        this.keepAliveInterval = null;
     }
 
     async sendMessage(url) {
@@ -22,22 +22,6 @@ class ChatClient {
 
         const data = await response.json();
         return data.thread_name;
-    }
-
-    async sendKeepAlive(url) {
-        try {
-            await fetch(url, { method: "POST" });
-        } catch (error) {
-            console.error("Error sending keep-alive:", error);
-        }
-    }
-
-    startKeepAlive(interval, url) {
-        this.keepAliveInterval = setInterval(() => this.sendKeepAlive(url), interval);
-    }
-
-    stopKeepAlive() {
-        if (this.keepAliveInterval) clearInterval(this.keepAliveInterval);
     }
 
     listenToServer(url, threadName) {
