@@ -36,11 +36,12 @@
             </div>
 
             <!-- Document Viewer Section -->
-            <div class="col-0 hidden d-flex flex-column h-100" id="document-viewer-section"> <!-- Hidden and no space initially -->
-                <div class="h-100 overflow-auto">
-                    <button id="close-button" style="position: absolute; top: 10px; right: 10px; z-index: 10;">Close</button>
-                    <iframe id="document-viewer" style="width: 100%; height: 100%; border: none; background-color: white;"></iframe>
+            <div class="col-6 d-flex flex-column h-100 p-3 bg-light border-left" id="document-viewer-section" style="display: none;"> <!-- Hidden and no space initially -->
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <h5 class="mb-0">Document Viewer</h5>
+                    <button id="close-button" class="btn btn-danger">Close</button>
                 </div>
+                <iframe id="document-viewer" class="flex-grow-1 border-0 rounded" style="background-color: white;"></iframe>
             </div>
         </div>
     </div>
