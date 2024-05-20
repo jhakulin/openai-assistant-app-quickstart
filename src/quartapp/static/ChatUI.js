@@ -15,7 +15,7 @@ class ChatUI {
         // Regular expression to find citations like [n] filename.md
         const citationRegex = /\[(\d+)\] ([^\s]+\.md)/g;
         return content.replace(citationRegex, (match, p1, p2) => {
-            return `<a href="#" class="file-citation" data-file-id="${p2}">[${p1}] ${p2}</a>`;
+            return `<a href="#" class="file-citation" data-file-name="${p2}">[${p1}] ${p2}</a>`;
         });
     }
 
@@ -23,21 +23,28 @@ class ChatUI {
         document.addEventListener('click', (event) => {
             if (event.target.classList.contains('file-citation')) {
                 event.preventDefault();
-                const fileId = event.target.getAttribute('data-file-id');
-                this.loadDocument(fileId);
+                const filename = event.target.getAttribute('data-file-name');
+                this.loadDocument(filename);
             }
         });
     }
 
-    async loadDocument(fileId) {
+    async loadDocument(filename) {
         try {
-            const response = await fetch(`/fetch-document?file_id=${fileId}`);
+            const response = await fetch(`/fetch-document?filename=${filename}`);
             if (!response.ok) {
                 throw new Error('Network response was not ok');
             }
-            const content = await response.text();
-            console.log("call showDocument:", content);
-            window.showDocument(content); // Use the global function to show the document
+            const markdownContent = await response.text();
+            // Use markdown-it to convert Markdown to HTML
+            const md = window.markdownit({
+                html: true,
+                linkify: true,
+                typographer: true,
+                breaks: true
+            });
+            const htmlContent = md.render(markdownContent);
+            window.showDocument(htmlContent);
         } catch (error) {
             console.error('Error fetching document:', error);
         }
@@ -51,9 +58,7 @@ class ChatUI {
     }
 
     appendAssistantMessage(messageDiv, accumulatedContent, isStreaming) {
-        //console.log("Accumulated Content before conversion:", accumulatedContent);
-    
-        // Initialize markdown-it
+        //console.log("Accumulated Content before conversion:", accumulatedContent);    
         const md = window.markdownit({
             html: true,
             linkify: true,

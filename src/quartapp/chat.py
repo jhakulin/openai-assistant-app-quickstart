@@ -15,6 +15,13 @@ from azure.ai.assistant.management.async_message import AsyncConversationMessage
 
 
 bp = Blueprint("chat", __name__, template_folder="templates", static_folder="static")
+
+# Assuming your files are stored in the 'files' directory at the project root
+file_id_map = {
+    "product_info_1.md": "product_info_1.md",
+    "product_info_2.md": "product_info_2.md",
+}
+
 user_queues = {}
 
 
@@ -50,14 +57,11 @@ async def read_config(assistant_name):
         # Log the current directory and its contents
         current_directory = os.getcwd()
         directory_contents = os.listdir(current_directory)
-        #current_app.logger.info(f"Current directory: {current_directory}")
-        #current_app.logger.info(f"Directory contents: {directory_contents}")
 
         # Attempt to read the configuration file
         current_app.logger.info(f"Reading assistant configuration from {config_path}")
         with open(config_path, "r") as file:
             content = file.read()
-            #current_app.logger.info(f"file contents: {content}")
             return content
     except FileNotFoundError as e:
         current_app.logger.error(f"Configuration file not found at {config_path}: {e}")
@@ -203,28 +207,35 @@ async def keep_alive():
     # Respond with an empty message to indicate that the connection is still active
     return Response("", status=200)
 
-@bp.get("/fetch-document")
+@bp.route('/fetch-document', methods=['GET'])
 async def fetch_document():
-    file_id = request.args.get('file_id')
-    current_app.logger.info(f"fetch_document: {file_id}")
-    if not file_id:
-        return jsonify({"error": "File ID is required"}), 400
+    filename = request.args.get('filename')
+    current_app.logger.info(f"Fetching document: {filename}")
+    if not filename:
+        return jsonify({"error": "Filename is required"}), 400
 
-    # Fetch the content based on file_id
-    content = await fetch_file_content(file_id)
-    if content is None:
-        return jsonify({"error": "File not found"}), 404
+    # Get the file path from the mapping
+    file_path = file_id_map.get(filename)
+    if not file_path:
+        return jsonify({"error": f"No file found for filename: {filename}"}), 404
 
-    return Response(content, mimetype='text/html')
+    # Construct the full path to the file
+    full_path = os.path.join('files', file_path)
 
-async def fetch_file_content(file_id):
-    # Replace with actual file fetching logic
-    dummy_content = {
-        "product_info_1.md": "<h1>Product Info 1</h1><p>Details about product 1...</p>",
-        "product_info_2.md": "<h1>Product Info 2</h1><p>Details about product 2...</p>",
-    }
-    current_app.logger.info(f"fetch_file_content: {dummy_content.get(file_id, None)}")
-    return dummy_content.get(file_id, None)
+    if not os.path.exists(full_path):
+        return jsonify({"error": f"File not found: {filename}"}), 404
+
+    try:
+        # Read the file content asynchronously using asyncio.to_thread
+        data = await asyncio.to_thread(read_file, full_path)
+        return Response(data, content_type='text/plain')
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+def read_file(path):
+    with open(path, 'r') as file:
+        return file.read()
 
 @bp.route('/stream/<thread_name>', methods=['GET'])
 async def stream_responses(thread_name):
